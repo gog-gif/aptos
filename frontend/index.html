@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photo NFT</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .container {
+        margin-top: 20px;
+      }
+      input,
+      button {
+        padding: 10px;
+        margin: 5px;
+        font-size: 16px;
+      }
+      textarea {
+        width: 300px;
+        height: 100px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Photo NFT DApp</h1>
+
+    <div>
+      <h2>Mint a New Photo NFT</h2>
+      <input
+        type="text"
+        id="photoHash"
+        placeholder="Photo hash (IPFS URL)"
+      /><br />
+      <textarea id="description" placeholder="Photo description"></textarea
+      ><br />
+      <label for="isPublic">Public:</label>
+      <input type="checkbox" id="isPublic" checked /><br />
+      <button onclick="mintPhoto()">Mint Photo</button>
+    </div>
+
+    <div class="container">
+      <h2>Grant Photo Access</h2>
+      <input type="number" id="photoIdGrant" placeholder="Photo ID" /><br />
+      <input
+        type="text"
+        id="viewerAddress"
+        placeholder="Viewer Address"
+      /><br />
+      <button onclick="grantPhotoAccess()">Grant Access</button>
+    </div>
+
+    <div class="container">
+      <h2>Check Access for a Photo</h2>
+      <input type="number" id="photoIdCheck" placeholder="Photo ID" /><br />
+      <input type="text" id="viewerCheck" placeholder="Viewer Address" /><br />
+      <button onclick="checkPhotoAccess()">Check Access</button>
+      <p id="accessResult"></p>
+    </div>
+
+    <script>
+      let web3;
+      let contract;
+      const contractAddress = "0xf51d9c50B62f8fBAB60E9AfC37b0f3D837Dec458";
+      const contractABI = [
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "uint256",
+              name: "photoId",
+              type: "uint256",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "viewer",
+              type: "address",
+            },
+          ],
+          name: "PhotoAccessGranted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "uint256",
+              name: "photoId",
+              type: "uint256",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "creator",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "photoHash",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "bool",
+              name: "isPublic",
+              type: "bool",
+            },
+          ],
+          name: "PhotoMinted",
+          type: "event",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_photoId",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "_viewer",
+              type: "address",
+            },
+          ],
+          name: "canViewPhoto",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_photoId",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "_viewer",
+              type: "address",
+            },
+          ],
+          name: "grantPhotoAccess",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "_photoHash",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "_description",
+              type: "string",
+            },
+            {
+              internalType: "bool",
+              name: "_isPublic",
+              type: "bool",
+            },
+          ],
+          name: "mintPhoto",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "ownerPhotos",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "photoAccess",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "photos",
+          outputs: [
+            {
+              internalType: "address",
+              name: "creator",
+              type: "address",
+            },
+            {
+              internalType: "string",
+              name: "photoHash",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "description",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+            {
+              internalType: "bool",
+              name: "isPublic",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ];
+
+      window.addEventListener("load", async () => {
+        if (window.ethereum) {
+          web3 = new Web3(window.ethereum);
+          await ethereum.enable(); // Request access to the user's Ethereum account
+          contract = new web3.eth.Contract(contractABI, contractAddress);
+          console.log("Web3 and contract initialized.");
+        } else {
+          alert("Please install MetaMask to use this DApp.");
+        }
+      });
+
+      // Mint a new photo NFT
+      async function mintPhoto() {
+        const photoHash = document.getElementById("photoHash").value;
+        const description = document.getElementById("description").value;
+        const isPublic = document.getElementById("isPublic").checked;
+        const accounts = await web3.eth.getAccounts();
+
+        if (photoHash && description) {
+          try {
+            const receipt = await contract.methods
+              .mintPhoto(photoHash, description, isPublic)
+              .send({ from: accounts[0] });
+            alert(
+              "Photo NFT Minted! Photo ID: " +
+                receipt.events.PhotoMinted.returnValues.photoId
+            );
+          } catch (error) {
+            console.error(error);
+            alert("Error minting photo.");
+          }
+        } else {
+          alert("Please fill in all fields.");
+        }
+      }
+
+      // Grant access to a private photo
+      async function grantPhotoAccess() {
+        const photoId = document.getElementById("photoIdGrant").value;
+        const viewerAddress = document.getElementById("viewerAddress").value;
+        const accounts = await web3.eth.getAccounts();
+
+        if (photoId && viewerAddress) {
+          try {
+            await contract.methods
+              .grantPhotoAccess(photoId, viewerAddress)
+              .send({ from: accounts[0] });
+            alert("Access granted!");
+          } catch (error) {
+            console.error(error);
+            alert("Error granting access.");
+          }
+        } else {
+          alert("Please provide photo ID and viewer address.");
+        }
+      }
+
+      // Check if a viewer can access a photo
+      async function checkPhotoAccess() {
+        const photoId = document.getElementById("photoIdCheck").value;
+        const viewerAddress = document.getElementById("viewerCheck").value;
+
+        try {
+          const result = await contract.methods
+            .canViewPhoto(photoId, viewerAddress)
+            .call();
+          const access = result
+            ? "Yes, you can view this photo."
+            : "No, you cannot view this photo.";
+          document.getElementById("accessResult").innerText = access;
+        } catch (error) {
+          console.error(error);
+          alert("Error checking access.");
+        }
+      }
+    </script>
+  </body>
+</html>
